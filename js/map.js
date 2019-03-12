@@ -1,13 +1,14 @@
 // placeholder of histogram chart
 
 
-var width = 960,
-    height = 700;
+var width = Math.max(960, window.innerWidth),
+    height = Math.max(500, window.innerHeight),
     radius = 6,
     fill = "rgba(255, 49, 255, 0.388)",
     stroke = "rgba(0, 0, 0, 0.5)",
-    strokeWidth = 0.1;
-
+    strokeWidth = 0.1,
+    pi = Math.PI,
+    tau = 2 * Math.PI;
 
 // button of click to point office location
 var selectWorkLoc = false;
@@ -28,17 +29,29 @@ var albersProjection = d3.geoAlbers()
 var geoPath = d3.geoPath()
     .projection( albersProjection );
 
+// var zoom = d3.zoom()
+//     .scaleExtent([1 << 11, 1 << 14])
+//     .on("zoom", zoomed);
 
 // make a svg to hold the map
 var svg = d3.select("#mapcontainer").append("svg")
     .attr("width", width)
     .attr("height", height);
 
+var tiles = d3.tile()
+                      .size([width, height])
+                      .scale(albersProjection.scale() * tau)
+                      .translate(albersProjection([0, 0]));
+
+console.log(tiles.scale);
+
 // import data
 d3.queue()
-    .defer(d3.json, "data/ny.json")
-    .defer(d3.csv, "data/Rent_2017_5yr.csv")
+    .defer(d3.json, "data/nynj.json")
+    .defer(d3.csv, "data/Rent_2017_5yr_NYNJ.csv")
     .await(ready);
+
+
 
 // start construct an array of objects that includes geoid, centerCoord_long, centerCoord_lat, distance_to_center, median_rent
 var distanceRent = {}; 
@@ -49,7 +62,8 @@ function ready(error, us, rent) {
 
   // create a dictionary mapping GEOID: Median Gross Rent
 
-
+ // console.log(us);
+ // console.log(rent)
 
   var rentByGeoid = {}; // Create empty object for holding dataset
   rent.forEach(function(d) {
@@ -71,7 +85,18 @@ function ready(error, us, rent) {
     .range(["#f2f0f7", "#dadaeb", "#bcbddc", "#9e9ac8", "#756bb1", "#54278f"]);
 
   // get features from map
-  var features = topojson.feature(us, us.objects.cb_2017_36_bg_500k).features;
+  var features = topojson.feature(us, us.objects.NYNJ_merge).features;
+
+  
+
+  var raster = svg.selectAll("image")
+      .data(tiles, function(d) { console.log(d); return d; })
+      .enter().append("image")
+      .attr("xlink:href", function(d) { return "http://" + "abc"[d[1] % 3] + ".tile.openstreetmap.org/" + d[2] + "/" + d[0] + "/" + d[1] + ".png"; })
+      .attr("x", function(d) { return (d[0] + tiles.translate[0]) * tiles.scale; })
+      .attr("y", function(d) { return (d[1] + tiles.translate[1]) * tiles.scale; })
+      .attr("width", tiles.scale)
+      .attr("height", tiles.scale);
 
   var g = svg.append("g");
 
@@ -138,10 +163,28 @@ function ready(error, us, rent) {
           distanceRentList = Object.keys(distanceRent).map(function(key){return distanceRent[key];});
 
           console.log(distanceRent[360550116014]);
+
+          // data.forEach(function(d)
+
+          d3.select("#scatterplot").data(distanceRentList)
+            .enter().select("svg")
+            .append("g")
+            .append("circle")
+            .attr("class", "dot")
+            .attr("r", 3.5)
+            .attr("cx", "5px")
+            .attr("cy", "5px")
+            .style("fill", function(y) {
+              // console.log('start plot svg');
+              console.log(y.median_rent);
+              return color(distanceRent[parseFloat(y.geoid)])
+            });
         }
       })
       .style("fill", function(d) {return color(rentByGeoid[parseFloat(d.properties.GEOID)])})
       .style("stroke", "black");
+
+      
 
   distanceRentList = Object.keys(distanceRent).map(function(key){return distanceRent[key];});
   console.log(distanceRent[360550116014]);
@@ -159,8 +202,16 @@ var scattersvg = d3.select("#scatterplot").append("svg")
     .attr("height", "100%")
     .data(distanceRentList)
     .enter()
-    .append("p")
-    .text(function (d,i) {return "i = " + i + " d = "+d.median_rent;});
+    .append("circle")
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", "5px")
+      .attr("cy", "5px")
+      .style("fill", function(d) {
+        console.log('start plot svg');
+        console.log(d.median_rent);
+        return color(distanceRent[parseFloat(d["geoid"])])
+      });
 
 var data = [30, 86, 168, 281, 303, 365];
 
